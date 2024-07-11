@@ -136,11 +136,12 @@ num_sentences = len(sentences)
 # print("finished with clustering")
 
 # Load tweets and generate embeddings
+
 def load_tweets_and_embeddings(filenames, labels, model):
     X, y = [], []
     for filename, label in zip(filenames, labels):
         with open(filename, "rb") as f:
-            tweets = pickle.load(f)
+            tweets = pickle.load(f)[:30]  # Load only the first 30 entries
             X.extend(tweets)
             y.extend([label] * len(tweets))
     embeddings = model.encode(X)
@@ -246,22 +247,29 @@ print("finished with agglomerative")
 
 
 
+
+
+
 # def get_top_words_per_cluster(posts, labels, num_clusters=4, top_n=30):
+#     if len(posts) != len(labels):
+#         raise ValueError("The number of posts must match the number of labels")
+
 #     vectorizer = TfidfVectorizer(stop_words='english')
 #     X = vectorizer.fit_transform(posts)
 #     terms = vectorizer.get_feature_names_out()
-    
+
 #     top_words = {}
 #     for i in range(num_clusters):
-#         cluster_posts = X[labels == i]
+#         cluster_indices = [index for index, label in enumerate(labels) if label == i]
+#         cluster_posts = X[cluster_indices]
 #         mean_tfidf = cluster_posts.mean(axis=0).A1
 #         top_indices = mean_tfidf.argsort()[-top_n:]
 #         top_words[i] = [terms[ind] for ind in top_indices][::-1]
-    
+
 #     return top_words
 
 
-# # Get top words for K-Means clusters
+# # Assuming sentences and the corresponding labels for each clustering method are already defined
 # top_words_kmeans = get_top_words_per_cluster(sentences, kmeans_labels)
 # print("Top words per cluster for K-Means:")
 # for cluster, words in top_words_kmeans.items():
