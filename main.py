@@ -7,32 +7,37 @@ import pickle
 import os.path
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from sklearn.svm import SVC
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report
 
 # Load the dataset
-def dataloader():
+def dataloader(data_filename):
     tweets = []
     #if tweets have been pickled, load the pickle file
-    if os.path.isfile("tweets.pkl"):
-        with open ("tweets.pkl", "rb") as f:
+    if os.path.isfile("tweets_" + data_filename + ".pkl"):
+        with open ("tweets_" + data_filename + ".pkl", "rb") as f:
             tweets = pickle.load(f)
             return tweets
     #open the file, loop through every line, convert line to a dictionary, extract content
-    with open("datasets/evolution.txt", "r") as f:
+    with open("datasets/" + data_filename + ".txt", "r") as f:
         for line in f.readlines():
             tweet = ast.literal_eval(line)
-            tweets.append(tweet['content'])
-    with open("tweets.pkl", "wb") as f:
+            tweet = [x for x in tweet["content"].split(" ") if "#" not in x and "@" not in x and "http" not in x and "pic.twitter" not in x]
+            tweets.append(" ".join(tweet))
+    with open("tweets_" + data_filename + ".pkl", "wb") as f:
         pickle.dump(tweets, f)
     return tweets
 
 print("finished loading dataset")
 
+data_filename = "evolution"
 # Extract the sentences
-sentences = dataloader()
+sentences = dataloader(data_filename)
 
 # Load pre-trained model configuration and model
 model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
@@ -62,8 +67,8 @@ num_sentences = len(sentences)
 
 
 
-cosine_similarity_filename = "cosine_similarity_" + str(len(sentences)) + ".pkl"
-
+# cosine_similarity_filename = "cosine_similarity_" + str(len(sentences)) + ".pkl"
+#
 # def generate_cosine_similarities(batch_size=3000):
 #     cosine_similarities = {}
 #     start_index = 0
@@ -89,10 +94,6 @@ cosine_similarity_filename = "cosine_similarity_" + str(len(sentences)) + ".pkl"
 #     return cosine_similarities
 
 # cos_sims = generate_cosine_similarities()
-
-
-
-
 
 # print("finished with cosine similarites")
 
@@ -134,15 +135,38 @@ cosine_similarity_filename = "cosine_similarity_" + str(len(sentences)) + ".pkl"
 
 # print("finished with clustering")
 
+# Load tweets and generate embeddings
+def load_tweets_and_embeddings(filenames, labels, model):
+    X, y = [], []
+    for filename, label in zip(filenames, labels):
+        with open(filename, "rb") as f:
+            tweets = pickle.load(f)
+            X.extend(tweets)
+            y.extend([label] * len(tweets))
+    embeddings = model.encode(X)
+    return np.array(embeddings), np.array(y)
+
+
+# File paths and labels
+filenames = [
+    "tweets_test_data_evolution_true.pkl",
+    "tweets_test_data_evolution_false.pkl",
+    "tweets_test_data_not_evolution.pkl"
+]
+labels = [0, 1, 2]
+
+# Load tweets and generate embeddings and labels
+embeddings, y = load_tweets_and_embeddings(filenames, labels, model)
+
+
+dataloader("test_data_evolution_true")
+dataloader("test_data_evolution_false")
+dataloader("test_data_not_evolution")
 
 
 
 
 def draw(labels, name):
-     # Apply PCA to reduce dimensionality to 3D for better visualization
-    pca = PCA(n_components=2)
-    embeddings_pca = pca.fit_transform(embeddings)
-
     plt.ion()
 
     # Plot the 2D PCA results with K-Means cluster labels
@@ -152,7 +176,7 @@ def draw(labels, name):
 
     for label in unique_labels:
         class_member_mask = (labels == label)
-        xy = embeddings_pca[class_member_mask]
+        xy = embeddings[class_member_mask]
         plt.scatter(xy[:, 0], xy[:, 1], s=5, label=f'Cluster {label+1}', color=colors(label))
 
     plt.title('PCA of Sentence Embeddings with ' + name + ' Clusters')
@@ -182,54 +206,30 @@ def agglomerative_cluster(embeddings, num_clusters=7):
 
 
 
-# def find_optimal_gmm_clusters(embeddings, max_clusters=10):
-#     bics = []
-#     aics = []
-#     cluster_range = range(1, max_clusters + 1)
-#     print ("Cluster range: " + str(cluster_range))
-#     counter = 0
 
-#     for n_clusters in cluster_range:
-#         print(counter)
-#         counter+=1
-#         gmm = GaussianMixture(n_components=n_clusters, random_state=0)
-#         gmm.fit(embeddings)
-#         bics.append(gmm.bic(embeddings))
-#         aics.append(gmm.aic(embeddings))
 
-#     optimal_clusters_bic = cluster_range[np.argmin(bics)]
-#     optimal_clusters_aic = cluster_range[np.argmin(aics)]
 
-#     # Plot BIC and AIC
-#     plt.figure(figsize=(10, 7))
-#     plt.plot(cluster_range, bics, label='BIC')
-#     plt.plot(cluster_range, aics, label='AIC')
-#     plt.xlabel('Number of clusters')
-#     plt.ylabel('Score')
-#     plt.title('BIC and AIC for different numbers of clusters')
-#     plt.legend()
-#     plt.show()
+# Apply PCA to reduce dimensionality for better visualization
+pca = PCA(n_components=min(48, embeddings.shape[1] - 1))
+embeddings = pca.fit_transform(embeddings)
 
-#     return optimal_clusters_bic, optimal_clusters_aic
+# Apply t-SNE on the PCA-reduced data
+tsne = TSNE(n_components=2, random_state=42)
+embeddings = tsne.fit_transform(embeddings)
 
-# optimal_clusters_bic, optimal_clusters_aic = find_optimal_gmm_clusters(embeddings, max_clusters=10)
+# Train the SVM
+svm = SVC(kernel='linear')
+svm.fit(embeddings, y)
 
-# print(f"Optimal number of clusters by BIC: {optimal_clusters_bic}")
-# print(f"Optimal number of clusters by AIC: {optimal_clusters_aic}")
+# Predict and evaluate
+y_pred = svm.predict(embeddings)
+print(classification_report(y, y_pred))
 
-def get_top_words_per_cluster(posts, labels, num_clusters=4, top_n=30):
-    vectorizer = TfidfVectorizer(stop_words='english')
-    X = vectorizer.fit_transform(posts)
-    terms = vectorizer.get_feature_names_out()
-    
-    top_words = {}
-    for i in range(num_clusters):
-        cluster_posts = X[labels == i]
-        mean_tfidf = cluster_posts.mean(axis=0).A1
-        top_indices = mean_tfidf.argsort()[-top_n:]
-        top_words[i] = [terms[ind] for ind in top_indices][::-1]
-    
-    return top_words
+# Draw plots
+draw(y, "True Labels")
+print("finished with true labels")
+draw(y_pred, "SVM Predicted Labels")
+print("finished with SVM predictions")
 
 # Perform clustering
 kmeans_labels = k_means_cluster(embeddings, 4)
@@ -244,21 +244,38 @@ print("finished with GMM")
 draw(agglo_labels, "Agglomerative")
 print("finished with agglomerative")
 
-# Get top words for K-Means clusters
-top_words_kmeans = get_top_words_per_cluster(sentences, kmeans_labels)
-print("Top words per cluster for K-Means:")
-for cluster, words in top_words_kmeans.items():
-    print(f"Cluster {cluster + 1}: {', '.join(words)}")
 
-top_words_gmm = get_top_words_per_cluster(sentences, gmm_labels)
-print("Top words per cluster for GMM:")
-for cluster, words in top_words_gmm.items():
-    print(f"Cluster {cluster + 1}: {', '.join(words)}")
 
-top_words_agglo = get_top_words_per_cluster(sentences, agglo_labels)
-print("Top words per cluster for Agglomerative:")
-for cluster, words in top_words_agglo.items():
-    print(f"Cluster {cluster + 1}: {', '.join(words)}")
+# def get_top_words_per_cluster(posts, labels, num_clusters=4, top_n=30):
+#     vectorizer = TfidfVectorizer(stop_words='english')
+#     X = vectorizer.fit_transform(posts)
+#     terms = vectorizer.get_feature_names_out()
+    
+#     top_words = {}
+#     for i in range(num_clusters):
+#         cluster_posts = X[labels == i]
+#         mean_tfidf = cluster_posts.mean(axis=0).A1
+#         top_indices = mean_tfidf.argsort()[-top_n:]
+#         top_words[i] = [terms[ind] for ind in top_indices][::-1]
+    
+#     return top_words
+
+
+# # Get top words for K-Means clusters
+# top_words_kmeans = get_top_words_per_cluster(sentences, kmeans_labels)
+# print("Top words per cluster for K-Means:")
+# for cluster, words in top_words_kmeans.items():
+#     print(f"Cluster {cluster + 1}: {', '.join(words)}")
+
+# top_words_gmm = get_top_words_per_cluster(sentences, gmm_labels)
+# print("Top words per cluster for GMM:")
+# for cluster, words in top_words_gmm.items():
+#     print(f"Cluster {cluster + 1}: {', '.join(words)}")
+
+# top_words_agglo = get_top_words_per_cluster(sentences, agglo_labels)
+# print("Top words per cluster for Agglomerative:")
+# for cluster, words in top_words_agglo.items():
+#     print(f"Cluster {cluster + 1}: {', '.join(words)}")
 
 input("Press [enter] to end.")
 
