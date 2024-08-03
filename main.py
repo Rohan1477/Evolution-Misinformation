@@ -132,66 +132,6 @@ def plot_confusion_matrix(cm, title, labels):
     plt.show()
     plt.pause(0.001)
 
-# # Store metrics
-# training_sizes = [40, 50, 60, 70, 80, 90]
-# f1_scores = {0: [], 1: [], 2: []}
-# precision_scores = {0: [], 1: [], 2: []}
-# recall_scores = {0: [], 1: [], 2: []}
-
-# # Train the SVM with varying training sizes
-# for size in training_sizes:
-#     # Subset training data
-#     X_train, X_test, y_train, y_test = train_test_split(test_embeddings, y, train_size=size*3, stratify=y, random_state=42)
-
-#     # Ensure that the subset includes at least one sample from each class
-#     if len(np.unique(y_train)) < len(np.unique(y)):
-#         print(f"Skipping training size {size} as it does not include all classes.")
-#         continue
-
-#     # Apply PCA to reduce dimensionality for better visualization
-#     pca = PCA(n_components=min(40, test_embeddings.shape[1] - 1))
-#     X_train_pca = pca.fit_transform(X_train)
-#     full_embeddings_pca = pca.transform(full_embeddings)
-
-#     # Apply t-SNE on the PCA-reduced data
-#     tsne = TSNE(n_components=2, random_state=42)
-#     X_train_tsne = tsne.fit_transform(X_train_pca)
-#     full_embeddings_tsne = tsne.fit_transform(full_embeddings_pca)
-
-#     # Train the SVM
-#     svm = SVC(kernel='linear')
-#     svm.fit(X_train_tsne, y_train)
-
-#     # Predict and evaluate
-#     y_pred = svm.predict(X_train_tsne)
-
-#     # Confusion Matrix
-#     cm = confusion_matrix(y_train, y_pred)
-#     plot_confusion_matrix(cm, f'Confusion Matrix (Training Size: {size})')
-
-#     # Calculate precision, recall, and f1 score for each class
-#     for label in [0, 1, 2]:
-#         precision_scores[label].append(precision_score(y_train, y_pred, labels=[label], average='micro'))
-#         recall_scores[label].append(recall_score(y_train, y_pred, labels=[label], average='micro'))
-#         f1_scores[label].append(f1_score(y_train, y_pred, labels=[label], average='micro'))
-
-# # Plotting the metrics
-# def plot_metric(metric_values, metric_name):
-#     plt.figure(figsize=(10, 6))
-#     for label, values in metric_values.items():
-#         plt.plot(training_sizes, values, marker='o', label=f'Label {label}')
-#     plt.title(f'{metric_name} vs Training Size')
-#     plt.xlabel('Training Size')
-#     plt.ylabel(metric_name)
-#     plt.legend()
-#     plt.grid(True)
-#     plt.show()
-    
-
-# plot_metric(f1_scores, 'F1 Score')
-# plot_metric(precision_scores, 'Precision')
-# plot_metric(recall_scores, 'Recall')
-
 
 def filter_data_for_svm(test_embeddings, y, test_sentences, evolution_claims): #expieriment2
     evolution_claims_set = set([claim[0] for claim in evolution_claims])
@@ -231,7 +171,7 @@ def run_tsne(X_train, X_test, X_unrelated):
     tsne = TSNE(n_components=3, random_state=42, perplexity = 30, method = "exact")
     X_train_tsne = tsne.fit_transform(X_train)
     X_test_tsne = tsne.fit_transform(X_test)
-    #X_unrelated_tsne = tsne.fit_transform(X_unrelated)
+    X_unrelated_tsne = tsne.fit_transform(X_unrelated)
 
     return X_train_tsne, X_test_tsne
 
@@ -260,21 +200,39 @@ def make_report(X_train, y_train, X_test_evo_tsne, y_test_evo, y_test_combined, 
 
     
 
-
-
-def expieriment1(X_train, y_train, X_test, y_test):
+def expieriment1(X_train, y_train, X_test, y_test, X):
     print("EXPIERIMENT 1:")
-    X_train, X_test = run_tsne(X_train, X_test)
+
+    # Apply PCA to reduce dimensionality for better visualization
+    pca = PCA(n_components=min(48, X.shape[1] - 1))
+    X_train_pca = pca.fit_transform(X_train)
+    X_test_pca = pca.transform(X_test)
+    #full_embeddings = pca.transform(full_embeddings)
+
+    svm = SVC(kernel='rbf')
+    svm.fit(X_train_pca, y_train)
+
+    y_train_pred_svm = svm.predict(X_train_pca)
+    y_test_pred_svm = svm.predict(X_test_pca)
+
     labels = ["True", "False", "Unrelated"]
-    y_pred_train, y_pred_test = run_svm(X_train, y_train, X_test, y_test, labels)
-    make_report(X_train, y_train, X_test, y_test, y_pred_train, y_pred_test)
+
+    print("Testing Classification Report:")
+    print(classification_report(y_test
+                                , y_test_pred_svm))
+
+    cm_test = confusion_matrix(y_test, y_test_pred_svm)
+    plot_confusion_matrix(cm_test, 'Confusion Matrix - Testing Set', labels)
+
+    #make_report(X_train, y_train, X_test_pca, y_test, y_test, y_train_pred_svm, y_test_pred_svm, y_test_pred_svm, labels)
+
 
 
  # Function to calculate cosine similarity
 def calc_cosine_similarity(A, B):
     return np.dot(A, B) / (np.linalg.norm(A) * np.linalg.norm(B))
 
-def filter_sentences_by_cos_sim(sentence_embeddings, sentence_labels, reference_embeddings, threshold = 0.4):
+def filter_sentences_by_cos_sim(sentence_embeddings, sentence_labels, reference_embeddings, threshold = 0.67):
     X = []
     y = []
     X_unrealted = []
@@ -317,26 +275,13 @@ def only_evolution_claims(sentence_embeddings, sentence_labels):
 def expieriment2(X_train, y_train, X_test, y_test):
     print("EXPIERIMENT 2:")
    
-    # Define the list of reference claims about evolution
-    reference_claims = [
-        "A social media post about evolution",
-        "Evolution is real",
-        "A social media post about natural selection",
-        "Natural selection is real",
-        "God created humans",
-        "We did not evolve from apes",
-        "Adam and Eve were the first humans",
-        "Evolution is fake"
-    ]
-
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
 
-    # Get embeddings for the reference claims
-    reference_embeddings = model.encode(reference_claims)
+    threshold = 0.67
 
-    reference_embeddings = np.concatenate((np.array(reference_embeddings), np.array(X_train_evo)))
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), threshold)
 
-    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, reference_embeddings, 0.7)
+    print("Threshold: " + str(threshold))
 
     X_train_evo_tsne, X_test_evo_tsne = run_tsne(X_train_evo, X_test_evo, X_test_unrelated)
     
@@ -356,28 +301,11 @@ def expieriment2(X_train, y_train, X_test, y_test):
     make_report(X_train, y_train, X_test_evo_tsne, y_test_evo, y_test_combined, y_train_pred_svm, y_test_pred_svm, y_test_pred_combined, labels)
 
 def expieriment2_tsne(X_train, y_train, X_test, y_test):
-    print("EXPIERIMENT 2:")
+    print("EXPIERIMENT 2 TSNE:")
    
-    # Define the list of reference claims about evolution
-    reference_claims = [
-        "A social media post about evolution",
-        "Evolution is real",
-        "A social media post about natural selection",
-        "Natural selection is real",
-        "God created humans",
-        "We did not evolve from apes",
-        "Adam and Eve were the first humans",
-        "Evolution is fake"
-    ]
-
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
 
-    # Get embeddings for the reference claims
-    reference_embeddings = model.encode(reference_claims)
-
-    reference_embeddings = np.concatenate((np.array(reference_embeddings), np.array(X_train_evo)))
-
-    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, reference_embeddings, 0.7)
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.70)
 
     X_train_evo_tsne, X_test_evo_tsne = run_tsne(X_train_evo, X_test_evo, X_test_unrelated)
     
@@ -398,29 +326,15 @@ def expieriment2_tsne(X_train, y_train, X_test, y_test):
 
 
 def expieriment3(X_train, y_train, X_test, y_test):
-    print("EXPIERIMENT 2:")
-   
-    # Define the list of reference claims about evolution
-    reference_claims = [
-        "A social media post about evolution",
-        "Evolution is real",
-        "A social media post about natural selection",
-        "Natural selection is real",
-        "God created humans",
-        "We did not evolve from apes",
-        "Adam and Eve were the first humans",
-        "Evolution is fake"
-    ]
+    print("EXPIERIMENT 3:")
 
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
 
-    # Get embeddings for the reference claims
-    reference_embeddings = model.encode(reference_claims)
+    threshold = 0.69
 
-    reference_embeddings = np.concatenate((np.array(reference_embeddings), np.array(X_train_evo)))
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), threshold)
 
-    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, reference_embeddings, 0.7)
-
+    print("Threshold: " + str(threshold))
 
     y_test_pred = []
     for i, post in enumerate(X_test_evo):
@@ -449,6 +363,99 @@ def expieriment3(X_train, y_train, X_test, y_test):
 
 
 
+
+
+
+#####################
+def old_load_tweets_and_embeddings(filenames, labels, model):
+    X, y = [], []
+    for filename, label in zip(filenames, labels):
+        with open(filename, "rb") as f:
+            if label == 0:
+                tweets = pickle.load(f)[:96]
+            elif label == 1:
+                tweets = pickle.load(f)[:96]
+            elif label == 2:
+                tweets = pickle.load(f)[:96] 
+            else:
+                continue
+            print(f"Label {label}: Loaded {len(tweets)} tweets")
+            X.extend(tweets)
+            y.extend([label] * len(tweets))
+
+    test_embeddings = model.encode(X)
+    return np.array(test_embeddings), np.array(y)
+
+
+def old_expieriment1(X_train, y_train, X_test, y_test, full_embeddings):
+    # File paths and labels
+    filenames = [
+        "tweets_test_data_evolution_true.pkl",
+        "tweets_test_data_evolution_false.pkl",
+        "tweets_test_data_not_evolution.pkl"
+    ]
+    labels = [0, 1, 2]
+    # Load tweets and generate embeddings and labels
+    test_embeddings, y = old_load_tweets_and_embeddings(filenames, labels, model)
+
+    # Split the data into training and testing sets
+    #X_train, X_test, y_train, y_test = train_test_split(test_embeddings, y, test_size=0.40, random_state=42, stratify=y)
+
+    # Apply PCA to reduce dimensionality for better visualization
+    pca = PCA(n_components=min(48, test_embeddings.shape[1] - 1))
+    X_train = pca.fit_transform(X_train)
+    X_test = pca.transform(X_test)
+    full_embeddings = pca.transform(full_embeddings)
+
+    # Apply t-SNE on the PCA-reduced data
+    tsne = TSNE(n_components=2, random_state=42)
+    X_train_tsne = tsne.fit_transform(X_train)
+    X_test_tsne = tsne.fit_transform(X_test)
+    #full_embeddings_tsne = tsne.fit_transform(full_embeddings)
+
+    # Train the SVM
+    svm = SVC(kernel='rbf')
+    svm.fit(X_train_tsne, y_train)
+
+    # Predict and evaluate
+    y_pred_train = svm.predict(X_train_tsne)
+    y_pred_test = svm.predict(X_test_tsne)
+
+
+    # Classification Reports
+    print("Training Classification Report:")
+    print(classification_report(y_train, y_pred_train))
+    print("Testing Classification Report:")
+    print(classification_report(y_test, y_pred_test))
+
+    # Confusion matrices
+    cm_train = confusion_matrix(y_train, y_pred_train)
+    plot_confusion_matrix(cm_train, 'Confusion Matrix - Training Set')
+    cm_test = confusion_matrix(y_test, y_pred_test)
+    plot_confusion_matrix(cm_test, 'Confusion Matrix - Testing Set')
+
+
+
+    # Predict and evaluate
+    # predict_embeddings = test_embeddings
+    # y_pred = svm.predict(predict_embeddings)
+    # #print(classification_report(y, y_pred))
+
+    # Draw plots
+    draw(y_train, "True Labels - Train Set", X_train_tsne)
+    print("Finished drawing true labels for train set")
+    draw(y_test, "True Labels - Test Set", X_test_tsne)
+    print("Finished drawing true labels for test set")
+    draw(y_pred_train, "SVM Predicted Labels - Train Set", X_train_tsne)
+    print("Finished drawing SVM predictions for train set")
+    draw(y_pred_test, "SVM Predicted Labels - Test Set", X_test_tsne)
+    print("Finished drawing SVM predictions for test set")
+
+
+
+
+
+
 if __name__ == "__main__":
     labeled_sentences, y, embeddings_filename = load_tweets()
 
@@ -468,16 +475,17 @@ if __name__ == "__main__":
     X = np.array(model.encode(labeled_sentences))
 
 
-    X_train, X_test, y_train, y_test, sentences_train, sentences_test = train_test_split(X, y, labeled_sentences, test_size=0.25, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test, sentences_train, sentences_test = train_test_split(X, y, labeled_sentences, test_size=0.20, random_state=42, stratify=y)
 
     
 
+    old_expieriment1(X_train, y_train, X_test, y_test, full_embeddings)
+    expieriment1(X_train, y_train, X_test, y_test, X)
+    expieriment2(X_train, y_train, X_test, y_test)
+    expieriment2_tsne(X_train, y_train, X_test, y_test)
+    expieriment3(X_train, y_train, X_test, y_test)
 
-    #expieriment1()
-    #expieriment2(X_train, y_train, X_test, y_test)
-    #expieriment2_tsne(X_train, y_train, X_test, y_test)
-    #expieriment3(X_train, y_train, X_test, y_test)
 
 
 
-    input("Press [enter] to end.")
+    input("Press [enter] to end.") 
