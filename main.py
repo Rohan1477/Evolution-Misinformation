@@ -73,6 +73,7 @@ def load_tweets():
     dataloader("test_data_evolution_true")
     dataloader("test_data_evolution_false")
     dataloader("test_data_not_evolution")
+
     labeled_sentences, y = load_labeled_tweets(filenames, labels)
     embeddings_filename = "embeddings_" + str(len(sentences)) + ".pkl"
 
@@ -176,7 +177,7 @@ def expieriment1(X_train, y_train, X_test, y_test):
     exp_name = "Exp 1:"
     print("EXPIERIMENT 1:")
     
-    pca = PCA(n_components=min(48, np.concatenate((np.array(X_train), np.array(X_test))).shape[1] - 1))
+    pca = PCA(n_components=min(30, np.concatenate((np.array(X_train), np.array(X_test))).shape[1] - 1))
     X_train_pca = pca.fit_transform(X_train)
     X_test_pca = pca.transform(X_test)
 
