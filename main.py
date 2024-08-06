@@ -10,7 +10,9 @@ from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix
+from collections import Counter
 from sklearn.model_selection import train_test_split
+import random
 
 # Load the dataset
 def dataloader(data_filename):
@@ -115,15 +117,18 @@ def make_report(exp_name, X_train, y_train, X_test, y_test, y_train_pred, y_test
         print(exp_name + " Testing Classification Report:")
         print(classification_report(y_test, y_test_pred, target_names=labels, zero_division = 0))
     except: pass
+    # pred_counts = Counter(y_test_pred)
+    # pred_counts_df = pd.DataFrame(pred_counts.items(), columns=['Class', 'Count'])
+    # print(pred_counts_df)
 
     # Confusion matrices
-    try:
+    if not no_y_train_pred:
         cm_train = confusion_matrix(y_train, y_train_pred)
         plot_confusion_matrix(cm_train, exp_name + ' Confusion Matrix - Training Set', labels)
-    except: pass
-    if not no_y_train_pred:
+    try:
         cm_test = confusion_matrix(y_test, y_test_pred)
         plot_confusion_matrix(cm_test, exp_name + ' Confusion Matrix - Testing Set', labels)
+    except: pass
 
     try: draw(y_train, exp_name + " Train Set - True Labels", X_train)
     except: pass
@@ -132,6 +137,58 @@ def make_report(exp_name, X_train, y_train, X_test, y_test, y_train_pred, y_test
     except: pass
     try: draw(y_test_pred, exp_name + " Test Set - Predicted Labels", X_test)
     except: pass
+
+def generateSampleResults(y_test, y_test_pred, label_wanted):
+    true, false, unrelated= [], [], []
+    for i, (yt, yp) in enumerate(zip(y_test, y_test_pred)):
+        if yp == 0:
+            true.append(sentences_test[i])
+        if yp == 1:
+            false.append(sentences_test[i])
+        if yp == 2:
+            unrelated.append(sentences_test[i])
+
+    with open("sample_results.txt", "w") as f:
+        f.write("TRUE: \n")
+        for post in random.sample(true, 30):
+            try:
+                f.write(str(post) + "\n")
+            except: pass
+        f.write("\nFALSE: \n")
+        for post in random.sample(false, 30):
+            try:
+                f.write(str(post) + "\n")
+            except: pass
+        f.write("\nUNRELATED: \n")
+        for post in random.sample(unrelated, 30):
+            try:
+                f.write(str(post) + "\n")
+            except: pass
+
+    # tp, fp, tn, fn = [], [], [], []
+    # for i, (yt, yp) in enumerate(zip(y_test, y_test_pred)):
+    #     if yt == label_wanted and yp == label_wanted:
+    #         tp.append(sentences_test[i])
+    #     if yt != label_wanted and yp == label_wanted:
+    #         fp.append(sentences_test[i])
+    #     if yt != label_wanted and yp != label_wanted:
+    #         tn.append(sentences_test[i])
+    #     if yt == label_wanted and yp != label_wanted:
+    #         fn.append(sentences_test[i])
+
+    # with open("sample_results.txt", "w") as f:
+    #     f.write("TRUE POSITIVES: \n")
+    #     for post in tp[:30]:
+    #         f.write(str(post) + "\n")
+    #     f.write("\nFALSE POSITIVES: \n")
+    #     for post in fp[:30]:
+    #             f.write(str(post) + "\n")
+    #     f.write("\nTRUE NEGATIVES: \n")
+    #     for post in tn[:30]:
+    #         f.write(str(post) + "\n")
+    #     f.write("\nFALSE NEGATIVES: \n")
+    #     for post in fn[:30]:
+    #         f.write(str(post) + "\n")
 
 def calc_cosine_similarity(A, B):
     return np.dot(A, B) / (np.linalg.norm(A) * np.linalg.norm(B))
@@ -173,9 +230,9 @@ def only_evolution_claims(sentence_embeddings, sentence_labels):
     
     return X_train, y_train
 
-def expieriment1(X_train, y_train, X_test, y_test):
+def experiment1(X_train, y_train, X_test, y_test):
     exp_name = "Exp 1:"
-    print("EXPIERIMENT 1:")
+    print("EXPERIMENT 1:")
     
     pca = PCA(n_components=min(30, np.concatenate((np.array(X_train), np.array(X_test))).shape[1] - 1))
     X_train_pca = pca.fit_transform(X_train)
@@ -188,10 +245,11 @@ def expieriment1(X_train, y_train, X_test, y_test):
     y_test_pred_svm = svm.predict(X_test_pca)
     
     make_report(exp_name, X_train, y_train, X_test_pca, y_test, y_train_pred_svm, y_test_pred_svm)
+    #generateSampleResults(y_test, y_test_pred_svm, 1)
 
-def expieriment2(X_train, y_train, X_test, y_test):
+def experiment2(X_train, y_train, X_test, y_test):
     exp_name = "Exp 2:"
-    print("EXPIERIMENT 2:")
+    print("EXPERIMENT 2:")
    
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
     X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.67)
@@ -209,9 +267,9 @@ def expieriment2(X_train, y_train, X_test, y_test):
     #can't generate report for train vs train_pred b/c the training set itsn't filteted to take out the evolution claims using cos sim b/c the cos sim is comparing against the training set itself to determine if evo or not evo. Instead filtering is done perfectly (only_evolution_claims) (this is necesasry to train the SVM)
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train_pred_svm, y_test_pred_combined, no_y_train_pred = True)
 
-def expieriment2_pca(X_train, y_train, X_test, y_test):
+def experiment2_pca(X_train, y_train, X_test, y_test):
     exp_name = "Exp 2_PCA:"
-    print("EXPIERIMENT 2_PCA:")
+    print("EXPERIMENT 2_PCA:")
    
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
     X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.67)
@@ -233,9 +291,9 @@ def expieriment2_pca(X_train, y_train, X_test, y_test):
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train_pred_svm, y_test_pred_combined, no_y_train_pred = True)
 
 
-def expieriment3(X_train, y_train, X_test, y_test):
+def experiment3(X_train, y_train, X_test, y_test):
     exp_name = "Exp 3:"
-    print("EXPIERIMENT 3:")
+    print("EXPERIMENT 3:")
 
     X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
     X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.69)
@@ -279,10 +337,11 @@ if __name__ == "__main__":
     if use_full_dataset:
         X_test = full_embeddings
         y_test = np.zeros(len(X_test))
+        sentences_test = sentences
 
-    expieriment1(X_train, y_train, X_test, y_test)
-    expieriment2(X_train, y_train, X_test, y_test)
-    expieriment2_pca(X_train, y_train, X_test, y_test)
-    expieriment3(X_train, y_train, X_test, y_test)
+    experiment1(X_train, y_train, X_test, y_test)
+    experiment2(X_train, y_train, X_test, y_test)
+    experiment2_pca(X_train, y_train, X_test, y_test)
+    experiment3(X_train, y_train, X_test, y_test)
 
     input("Press [enter] to end.") 
