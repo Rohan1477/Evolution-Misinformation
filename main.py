@@ -34,7 +34,7 @@ def dataloader(data_filename):
             except (SyntaxError, ValueError) as e:
                 print(f"Error parsing line: {line.strip()}" + data_filename)
                 print(f"Error message: {e}")
-    with open("tweets_" + data_filename + ".pkl", "wb") as f:
+    with open("2tweets_" + data_filename + ".pkl", "wb") as f:
         pickle.dump(tweets, f)
     return tweets
 
@@ -236,33 +236,15 @@ def experiment1(X_train, y_train, X_test, y_test):
     exp_name = "Exp 1:"
     print("EXPERIMENT 1:")
 
-    #Best Coponemnt Level: 23, F1 of: 0.8
+    pca = PCA(n_components=min(23, np.concatenate((np.array(X_train), np.array(X_test))).shape[1] - 1))
+    X_train_pca = pca.fit_transform(X_train)
+    X_test_pca = pca.transform(X_test)
 
-    max_f1 = -1
-    max_components = -1
+    svm = SVC(kernel='rbf')
+    svm.fit(X_train_pca, y_train)
 
-    i = 12
-    while 12 <= i <= 70:
-        pca = PCA(n_components=min(i, np.concatenate((np.array(X_train), np.array(X_test))).shape[1] - 1))
-        X_train_pca = pca.fit_transform(X_train)
-        X_test_pca = pca.transform(X_test)
-
-        svm = SVC(kernel='rbf')
-        svm.fit(X_train_pca, y_train)
-
-        y_train_pred_svm = svm.predict(X_train_pca)
-        y_test_pred_svm = svm.predict(X_test_pca)
-
-        f1_scores = f1_score(y_test, y_test_pred_svm, average= None) 
-        f1 = f1_scores[1]
-
-        print(str(i) + ": " + str(f1))
-        if f1 > max_f1:
-            max_f1 = f1
-            max_components = i
-        i += 1
-    print ("Best Coponemnt Level: " + str(max_components) + ", F1 of: " + str(max_f1))
-
+    y_train_pred_svm = svm.predict(X_train_pca)
+    y_test_pred_svm = svm.predict(X_test_pca)
     
     make_report(exp_name, X_train, y_train, X_test_pca, y_test, y_train_pred_svm, y_test_pred_svm)
     #generateSampleResults(y_test, y_test_pred_svm, 1)
@@ -271,36 +253,18 @@ def experiment2(X_train, y_train, X_test, y_test):
     exp_name = "Exp 2:"
     print("EXPERIMENT 2:")
 
-    #Best F1: 0.7567567567567568, Threshold of: 0.63
+    X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.63)
+    
+    svm = SVC(kernel='rbf')
+    svm.fit(X_train_evo, y_train_evo)
 
-    max_f1 = -1
-    max_index = -1
-    max_thresh = -1
+    y_train_pred_svm = svm.predict(X_train_evo)
+    y_test_pred_svm = svm.predict(X_test_evo)
 
-    j = .60
-    while .60 <= j <= .75:    
-        X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
-        X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), j)
-        
-        svm = SVC(kernel='rbf')
-        svm.fit(X_train_evo, y_train_evo)
-
-        y_train_pred_svm = svm.predict(X_train_evo)
-        y_test_pred_svm = svm.predict(X_test_evo)
-
-        # Combine unrelated predictions with SVM predictions
-        y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred_svm))
-        y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
-
-        f1_scores = f1_score(y_test_combined, y_test_pred_combined, average= None) 
-        f1 = f1_scores[1]
-
-        print(str(j) + ": " + str(f1))
-        if f1 > max_f1:
-            max_f1 = f1
-            max_thresh = j
-        j += .01
-    print ("Best F1: " + str(max_f1) + ", Threshold of: " + str(max_thresh))
+    # Combine unrelated predictions with SVM predictions
+    y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred_svm))
+    y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
 
     #can't generate report for train vs train_pred b/c the training set itsn't filteted to take out the evolution claims using cos sim b/c the cos sim is comparing against the training set itself to determine if evo or not evo. Instead filtering is done perfectly (only_evolution_claims) (this is necesasry to train the SVM)
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train_pred_svm, y_test_pred_combined, no_y_train_pred = True)
@@ -309,86 +273,46 @@ def experiment2_pca(X_train, y_train, X_test, y_test):
     exp_name = "Exp 2_PCA:"
     print("EXPERIMENT 2_PCA:")
 
-    #Best Coponemnt Level: 54, F1 of: 0.7894736842105263, Threshold of: 0.63
-    max_f1 = -1
-    max_components = -1
-    max_thresh = -1
+    X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.63)
 
-    i = 12
-    while 12 <= i <= 70:
-        j = .60
-        while .60 <= j <= .75:
-            X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
-            X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), j)
+    pca = PCA(n_components=min(54, X.shape[1] - 1))
+    X_train_evo_pca = pca.fit_transform(X_train_evo)
+    X_test_evo_pca = pca.transform(X_test_evo)
+    
+    svm = SVC(kernel='rbf')
+    svm.fit(X_train_evo_pca, y_train_evo)
 
-            pca = PCA(n_components=min(i, X.shape[1] - 1))
-            X_train_evo_pca = pca.fit_transform(X_train_evo)
-            X_test_evo_pca = pca.transform(X_test_evo)
-            
-            svm = SVC(kernel='rbf')
-            svm.fit(X_train_evo_pca, y_train_evo)
+    y_train_pred_svm = svm.predict(X_train_evo_pca)
+    y_test_pred_svm = svm.predict(X_test_evo_pca)
 
-            y_train_pred_svm = svm.predict(X_train_evo_pca)
-            y_test_pred_svm = svm.predict(X_test_evo_pca)
-
-            # Combine unrelated predictions with SVM predictions
-            y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred_svm))
-            y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
-
-            f1_scores = f1_score(y_test_combined, y_test_pred_combined, average= None) 
-            f1 = f1_scores[1]
-
-            print(str(i) + ", " + str(j) + ": " + str(f1))
-            if f1 > max_f1:
-                max_f1 = f1
-                max_components = i
-                max_thresh = j
-            j += .01
-        i += 1
-    print ("Best Coponemnt Level: " + str(max_components) + ", F1 of: " + str(max_f1) + ", Threshold of: " + str(max_thresh))
+    # Combine unrelated predictions with SVM predictions
+    y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred_svm))
+    y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
 
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train_pred_svm, y_test_pred_combined, no_y_train_pred = True)
-
 
 def experiment3(X_train, y_train, X_test, y_test):
     exp_name = "Exp 3:"
     print("EXPERIMENT 3:")
+ 
+    X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
+    X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), 0.63)
 
-    #Best F1: 0.7317073170731707, Threshold of: 0.63
+    y_test_pred = []
+    for i, post in enumerate(X_test_evo):
+        max_cos_sim = 0
+        label_of_max = None
+        for j, ref_post in enumerate(X_train_evo):
+            similarity = calc_cosine_similarity(post, ref_post)
+            if max_cos_sim < similarity:
+                max_cos_sim = similarity
+                label_of_max = y_train_evo[j]
+        y_test_pred.append(label_of_max)
 
-    max_f1 = -1
-    max_index = -1
-    max_thresh = -1
-
-    k = .60
-    while .60 <= k <= .75:    
-        X_train_evo, y_train_evo = only_evolution_claims(X_train, y_train)
-        X_test_evo, y_test_evo, X_test_unrelated, y_test_unrelated_actual, y_test_unrelated_pred = filter_sentences_by_cos_sim(X_test, y_test, np.array(X_train_evo), k)
-
-        y_test_pred = []
-        for i, post in enumerate(X_test_evo):
-            max_cos_sim = 0
-            label_of_max = None
-            for j, ref_post in enumerate(X_train_evo):
-                similarity = calc_cosine_similarity(post, ref_post)
-                if max_cos_sim < similarity:
-                    max_cos_sim = similarity
-                    label_of_max = y_train_evo[j]
-            y_test_pred.append(label_of_max)
-
-        # Combine unrelated predictions with SVM predictions
-        y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred))
-        y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
-
-        f1_scores = f1_score(y_test_combined, y_test_pred_combined, average= None) 
-        f1 = f1_scores[1]
-
-        print(str(k) + ": " + str(f1))
-        if f1 > max_f1:
-            max_f1 = f1
-            max_thresh = k
-        k += .01
-    print ("Best F1: " + str(max_f1) + ", Threshold of: " + str(max_thresh))
+    # Combine unrelated predictions with SVM predictions
+    y_test_pred_combined = np.concatenate((y_test_unrelated_pred, y_test_pred))
+    y_test_combined = np.concatenate((y_test_unrelated_actual, y_test_evo))
 
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train, y_test_pred_combined, no_y_train_pred = True)
 
