@@ -34,7 +34,7 @@ def dataloader(data_filename):
             except (SyntaxError, ValueError) as e:
                 print(f"Error parsing line: {line.strip()}" + data_filename)
                 print(f"Error message: {e}")
-    with open("2tweets_" + data_filename + ".pkl", "wb") as f:
+    with open("tweets_" + data_filename + ".pkl", "wb") as f:
         pickle.dump(tweets, f)
     return tweets
 
@@ -119,9 +119,9 @@ def make_report(exp_name, X_train, y_train, X_test, y_test, y_train_pred, y_test
         print(exp_name + " Testing Classification Report:")
         print(classification_report(y_test, y_test_pred, target_names=labels, zero_division = 0))
     except: pass
-    # pred_counts = Counter(y_test_pred)
-    # pred_counts_df = pd.DataFrame(pred_counts.items(), columns=['Class', 'Count'])
-    # print(pred_counts_df)
+    pred_counts = Counter(y_test_pred)
+    pred_counts_df = pd.DataFrame(pred_counts.items(), columns=['Class', 'Count'])
+    print(pred_counts_df)
 
     # Confusion matrices
     if not no_y_train_pred:
@@ -247,7 +247,7 @@ def experiment1(X_train, y_train, X_test, y_test):
     y_test_pred_svm = svm.predict(X_test_pca)
     
     make_report(exp_name, X_train, y_train, X_test_pca, y_test, y_train_pred_svm, y_test_pred_svm)
-    #generateSampleResults(y_test, y_test_pred_svm, 1)
+    generateSampleResults(y_test, y_test_pred_svm, 1)
 
 def experiment2(X_train, y_train, X_test, y_test):
     exp_name = "Exp 2:"
@@ -317,7 +317,7 @@ def experiment3(X_train, y_train, X_test, y_test):
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train, y_test_pred_combined, no_y_train_pred = True)
 
 if __name__ == "__main__":
-    use_full_dataset = False
+    use_full_dataset = True
 
     labeled_sentences, y, embeddings_filename = load_tweets()
     # Get embeddings
