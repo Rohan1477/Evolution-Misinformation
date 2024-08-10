@@ -18,4 +18,5 @@ create_content_only.py
 !tweets_test_data_evolution_true.pkl
 !tweets_test_data_evolution_false.pkl
 !tweets_test_data_not_evolution.pkl
+!sample_results.txt
 .DS_Store

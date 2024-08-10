@@ -47,6 +47,16 @@ sentences = dataloader(data_filename)
 # Load pre-trained model configuration and model
 model = SentenceTransformer('paraphrase-MiniLM-L6-v2').to("mps")
 
+
+# def get_dates(dataset):
+#     with open("datasets/" + data_filename + ".txt", "r") as f:
+#         lines = f.readlines()
+#         random.shuffle(lines)
+#         dates = []
+#         for line in dataset:
+#             dates.append(line[date])
+#         return dates
+
 # Load tweets and generate embeddings
 def load_labeled_tweets(filenames, labels):
     sentences, y = [], []
@@ -151,21 +161,21 @@ def generateSampleResults(y_test, y_test_pred, label_wanted):
             unrelated.append(sentences_test[i])
 
     with open("sample_results.txt", "w") as f:
-        f.write("TRUE: \n")
-        for post in random.sample(true, 30):
-            try:
-                f.write(str(post) + "\n")
-            except: pass
+        # f.write("TRUE: \n")
+        # for post in random.sample(true, 30):
+        #     try:
+        #         f.write(str(post) + "\n")
+        #     except: pass
         f.write("\nFALSE: \n")
-        for post in random.sample(false, 30):
+        for post in false:
             try:
                 f.write(str(post) + "\n")
             except: pass
-        f.write("\nUNRELATED: \n")
-        for post in random.sample(unrelated, 30):
-            try:
-                f.write(str(post) + "\n")
-            except: pass
+        # f.write("\nUNRELATED: \n")
+        # for post in random.sample(unrelated, 30):
+        #     try:
+        #         f.write(str(post) + "\n")
+        #     except: pass
 
     # tp, fp, tn, fn = [], [], [], []
     # for i, (yt, yp) in enumerate(zip(y_test, y_test_pred)):
@@ -335,14 +345,18 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test, sentences_train, sentences_test = train_test_split(X, y, labeled_sentences, test_size=0.20, random_state=42, stratify=y)
 
+    X_train = np.concatenate((X_train, X_test))
+    y_train = np.concatenate((y_train, y_test))
+
     if use_full_dataset:
         X_test = full_embeddings
         y_test = np.zeros(len(X_test))
         sentences_test = sentences
 
+
     experiment1(X_train, y_train, X_test, y_test)
-    experiment2(X_train, y_train, X_test, y_test)
-    experiment2_pca(X_train, y_train, X_test, y_test)
-    experiment3(X_train, y_train, X_test, y_test)
+    #experiment2(X_train, y_train, X_test, y_test)
+    #experiment2_pca(X_train, y_train, X_test, y_test)
+    #experiment3(X_train, y_train, X_test, y_test)
 
     input("Press [enter] to end.") 
