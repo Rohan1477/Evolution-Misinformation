@@ -13,6 +13,8 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score
 from collections import Counter
 from sklearn.model_selection import train_test_split
 import random
+import json
+from datetime import datetime
 
 # Load the dataset
 def dataloader(data_filename):
@@ -40,22 +42,35 @@ def dataloader(data_filename):
 
 print("finished loading dataset")
 
+def get_dates():
+    dates = []
+
+    with open("datasets/" + "evolution" + ".txt", "r") as f:
+        for line in f:
+            # Parse the line as JSON
+            data = json.loads(line)
+            # Extract the date and append it to the list
+            dates.append(data['date'])
+    return dates
+
+def get_year_breakdown(dates):
+    date_detailed = []
+    for i, date in enumerate(dates):
+        date_detailed.append(datetime.strptime(date, "%Y-%m-%d")) 
+
+    year_counts = Counter(date.year for date in date_detailed)
+    
+    for year, count in year_counts.items():
+        print(f"Year: {year}, Count: {count}")
+    
 data_filename = "evolution"
 # Extract the sentences
 sentences = dataloader(data_filename)
+dates = get_dates()
 
 # Load pre-trained model configuration and model
 model = SentenceTransformer('paraphrase-MiniLM-L6-v2').to("mps")
 
-
-# def get_dates(dataset):
-#     with open("datasets/" + data_filename + ".txt", "r") as f:
-#         lines = f.readlines()
-#         random.shuffle(lines)
-#         dates = []
-#         for line in dataset:
-#             dates.append(line[date])
-#         return dates
 
 # Load tweets and generate embeddings
 def load_labeled_tweets(filenames, labels):
@@ -90,6 +105,7 @@ def load_tweets():
 
     labeled_sentences, y = load_labeled_tweets(filenames, labels)
     embeddings_filename = "embeddings_" + str(len(sentences)) + ".pkl"
+    # dates = get_dates()
 
     return labeled_sentences, y, embeddings_filename
 
@@ -136,10 +152,12 @@ def make_report(exp_name, X_train, y_train, X_test, y_test, y_train_pred, y_test
     # Confusion matrices
     if not no_y_train_pred:
         cm_train = confusion_matrix(y_train, y_train_pred)
-        plot_confusion_matrix(cm_train, exp_name + ' Confusion Matrix - Training Set', labels)
+        #plot_confusion_matrix(cm_train, exp_name + ' Confusion Matrix - Training Set', labels)
+        plot_confusion_matrix(cm_train, "", labels)
     try:
         cm_test = confusion_matrix(y_test, y_test_pred)
-        plot_confusion_matrix(cm_test, exp_name + ' Confusion Matrix - Testing Set', labels)
+        #plot_confusion_matrix(cm_test, exp_name + ' Confusion Matrix - Testing Set', labels)
+        plot_confusion_matrix(cm_test, "", labels)
     except: pass
 
     try: draw(y_train, exp_name + " Train Set - True Labels", X_train)
@@ -151,14 +169,20 @@ def make_report(exp_name, X_train, y_train, X_test, y_test, y_train_pred, y_test
     except: pass
 
 def generateSampleResults(y_test, y_test_pred, label_wanted):
+    global dates, sentences
     true, false, unrelated= [], [], []
+    false_dates = []
     for i, (yt, yp) in enumerate(zip(y_test, y_test_pred)):
         if yp == 0:
             true.append(sentences_test[i])
         if yp == 1:
             false.append(sentences_test[i])
+            false_dates.append(str(dates[i]))
         if yp == 2:
             unrelated.append(sentences_test[i])
+    
+    get_year_breakdown(false_dates)
+
 
     with open("sample_results.txt", "w") as f:
         # f.write("TRUE: \n")
@@ -327,7 +351,7 @@ def experiment3(X_train, y_train, X_test, y_test):
     make_report(exp_name, X_train, y_train, X_test, y_test_combined, y_train, y_test_pred_combined, no_y_train_pred = True)
 
 if __name__ == "__main__":
-    use_full_dataset = True
+    use_full_dataset = False
 
     labeled_sentences, y, embeddings_filename = load_tweets()
     # Get embeddings
@@ -345,9 +369,6 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test, sentences_train, sentences_test = train_test_split(X, y, labeled_sentences, test_size=0.20, random_state=42, stratify=y)
 
-    X_train = np.concatenate((X_train, X_test))
-    y_train = np.concatenate((y_train, y_test))
-
     if use_full_dataset:
         X_test = full_embeddings
         y_test = np.zeros(len(X_test))
@@ -355,8 +376,8 @@ if __name__ == "__main__":
 
 
     experiment1(X_train, y_train, X_test, y_test)
-    #experiment2(X_train, y_train, X_test, y_test)
-    #experiment2_pca(X_train, y_train, X_test, y_test)
-    #experiment3(X_train, y_train, X_test, y_test)
+    experiment2(X_train, y_train, X_test, y_test)
+    experiment2_pca(X_train, y_train, X_test, y_test)
+    experiment3(X_train, y_train, X_test, y_test)
 
     input("Press [enter] to end.") 
